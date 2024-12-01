@@ -6,9 +6,10 @@ import WindowIcon from "@mui/icons-material/Window";
 import TranslateIcon from "@mui/icons-material/Translate";
 import ReCAPTCHA from "react-google-recaptcha";
 import { Verify } from "react-puzzle-captcha";
+import { loadCaptchaEnginge, LoadCanvasTemplate, LoadCanvasTemplateNoReload, validateCaptcha } from 'react-simple-captcha';
 const BotDetectionComponent = () => {
   const [keyPressData, setKeyPressData] = useState([]);
-
+  const [value,setValue]= useState("");
   useEffect(() => {
     let lastKey = null;
     let lastKeyTime = 0;
@@ -82,15 +83,55 @@ const BotDetectionComponent = () => {
   let lastKeystrokeTime = useRef(null);
   const [showCaptcha1, setShowCaptcha1] = useState(false);
   const [showCaptcha2, setShowCaptcha2] = useState(false);
+  const [showCaptcha3,setShowCaptcha3] = useState(false);
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const [captchaVerified1, setCaptchaVerified1] = useState(false);
   const [result, setResult] = useState("");
+  const [isCanvasReady, setCanvasReady] = useState(false);
+  const canvasRef = useRef(null);
   const handleCaptchaChange = (value) => {
     if (value) {
       setCaptchaVerified(true);
     }
   };
+  useEffect(() => {
+    if (showCaptcha3) {
+      loadCaptchaEnginge(6);
+      const observer = new MutationObserver(() => {
+        const canvas = document.querySelector("canvas");
+        if (canvas) {
+          canvasRef.current = canvas;
 
+          // Add the contextmenu event listener
+          canvas.addEventListener("contextmenu", handleDownloadEvent);
+          setCanvasReady(true); // Canvas is ready
+          observer.disconnect(); // Stop observing after canvas is found
+        }
+      });
+
+      // Observe changes in the DOM
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+
+      return () => {
+        if (canvasRef.current) {
+          canvasRef.current.removeEventListener("contextmenu", handleDownloadEvent);
+        }
+        observer.disconnect(); // Cleanup observer
+      };
+    }
+  }, [showCaptcha3]);
+
+  const handleDownloadEvent = (e) => {
+     // Prevent the default context menu
+    console.log("CAPTCHA image download intercepted!");
+
+    // Optionally capture the image data URL
+    const imageData = canvasRef.current.toDataURL("image/png");
+    console.log("Image Data URL:", imageData);
+  }
   useEffect(() => {
     const getBrowserPlugins = () => {
       const pluginList = [];
@@ -101,9 +142,10 @@ const BotDetectionComponent = () => {
       } else {
         pluginList.push("No plugins detected or plugins are blocked.");
       }
+
       return pluginList;
     };
-
+   
     setPlugins(getBrowserPlugins());
   }, []);
 
@@ -354,26 +396,11 @@ const BotDetectionComponent = () => {
     return () => clearInterval(scrollBehaviorInterval);
   }, [scrollData, scrollStartTime]);
 
-  // useEffect(() => {
-  //   const entryTime = Date.now();
-  //   setStartTime(entryTime);
+  useEffect(() => {
+    const entryTime = Date.now();
+    setStartTime(entryTime);
 
-  //   return () => {
-  //     const exitTime = performance.now();
-  //     const timeSpent = (exitTime - entryTime) / 1000;
-
-  //     let timeData = JSON.parse(localStorage.getItem("pageTimeData")) || {};
-  //     timeData["Forms"] = (timeData["Forms"] || 0) + timeSpent;
-  //     localStorage.setItem("pageTimeData", JSON.stringify(timeData));
-
-  //     console.log(`Time spent on the page: ${timeSpent} seconds`);
-  //     console.log(
-  //       "Total time spent on this page:",
-  //       timeData["Forms"],
-  //       "seconds"
-  //     );
-  //   };
-  // }, []);
+  }, []);
 
   useEffect(() => {
     const handleClick = (event) => {
@@ -853,7 +880,10 @@ const BotDetectionComponent = () => {
       if (detectionScore >= 60 && detectionScore <= 80) {
         setShowCaptcha1(true);
       }
-      if (detectionScore < 60) {
+      if (detectionScore >= 40 && detectionScore < 60){
+        setShowCaptcha3(true);
+      }
+      if (detectionScore < 40) {
         setShowCaptcha2(true);
       }
       console.log("Detection score", detectionScore); // Set the score to display in the UI
@@ -864,6 +894,14 @@ const BotDetectionComponent = () => {
       setLoading(false); // Set loading to false after completion
     }
   };
+  const verifyCaptcha = ()=>{
+      if(validateCaptcha(value)==true){
+        setShowDialog(true);
+      }
+      else{
+        setShowCaptcha2(true);
+      }
+  }
 
   // const runGetData = async () =>{
   //   try
@@ -1074,6 +1112,35 @@ const BotDetectionComponent = () => {
                 />
               </div>
             )}
+            {
+              showCaptcha3 && (
+                <div className="m-5" >
+                <LoadCanvasTemplate/>
+              
+                
+                <div className=" border border-slate-500  m-3 rounded-md">
+                    <input
+                      type="text"
+                      name="field7"
+                      className="w-full h-full p-3"
+                      placeholder="Enter CAPTCHA"
+                      onChange={(e)=>setValue(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    style={{
+                      background:
+                        "linear-gradient(90deg, rgba(2,0,36,1) 0%, rgba(9,9,121,1) 35%, rgba(0,212,255,1) 100%)",
+                    }}
+                    onClick={verifyCaptcha}
+                    className="sub w-20 text-white p-2 px-3 m-2 rounded-lg"
+                  >
+                    Submit
+                  </button>
+                  </div>
+              )
+            }
+
 
             {/* <Suspense fallback={<div>Loading CAPTCHA...</div>}>
               <Facaptcha
